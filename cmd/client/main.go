@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -63,7 +64,7 @@ func main() {
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.QueueDurable,
-		handlerWar(gamestate),
+		handlerWar(channel, gamestate),
 	)
 	if err != nil {
 		log.Fatalf("Could not subscribe to queue: %v\n", err)
@@ -114,4 +115,17 @@ loop0:
 	}
 
 	fmt.Println("Gracefully shutting down")
+}
+
+func publishGameLog(ch *amqp.Channel, username, msg string) error {
+	return pubsub.PublishGob(
+		ch,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug+"."+username,
+		routing.GameLog{
+			Username:    username,
+			CurrentTime: time.Now(),
+			Message:     msg,
+		},
+	)
 }

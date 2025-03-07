@@ -1,7 +1,9 @@
 package pubsub
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 
@@ -31,6 +33,28 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 
 	msg := amqp.Publishing{
 		ContentType: "application/json",
+		Body:        body,
+	}
+
+	err = ch.PublishWithContext(context.Background(), exchange, key, false, false, msg)
+	if err != nil {
+		return fmt.Errorf("Cannot publish message to RabbitMQ: %v", err)
+	}
+
+	return nil
+}
+
+func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
+	var buf bytes.Buffer
+	encoder := gob.NewEncoder(&buf)
+	err := encoder.Encode(val)
+	if err != nil {
+		return err
+	}
+	body := buf.Bytes()
+
+	msg := amqp.Publishing{
+		ContentType: "application/gob",
 		Body:        body,
 	}
 
