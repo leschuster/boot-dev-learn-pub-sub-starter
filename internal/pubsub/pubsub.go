@@ -105,6 +105,46 @@ func SubscribeJSON[T any](
 	simpleQueueType SimpleQueueType,
 	handler func(T) AckType,
 ) error {
+	unmarshaller := func(data []byte) (T, error) {
+		var target T
+		err := json.Unmarshal(data, &target)
+		return target, err
+	}
+
+	return subscribe(conn, exchange, queueName, key, simpleQueueType, handler, unmarshaller)
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	simpleQueueType SimpleQueueType,
+	handler func(T) AckType,
+) error {
+	ungobler := func(data []byte) (T, error) {
+		buffer := bytes.NewBuffer(data)
+		decoder := gob.NewDecoder(buffer)
+		var target T
+		err := decoder.Decode(&target)
+		if err != nil {
+			return *new(T), err
+		}
+		return target, nil
+	}
+
+	return subscribe(conn, exchange, queueName, key, simpleQueueType, handler, ungobler)
+}
+
+func subscribe[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	simpleQueueType SimpleQueueType,
+	handler func(T) AckType,
+	unmarshaller func([]byte) (T, error),
+) error {
 	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
 	if err != nil {
 		return err
@@ -115,18 +155,12 @@ func SubscribeJSON[T any](
 		return err
 	}
 
-	unmarshaller := func(data []byte) (T, error) {
-		var target T
-		err := json.Unmarshal(data, &target)
-		return target, err
-	}
-
 	go func() {
 		defer ch.Close()
 		for msg := range msgs {
 			target, err := unmarshaller(msg.Body)
 			if err != nil {
-				fmt.Printf("Error unmarshalling JSON: %v\n", err)
+				fmt.Printf("error: cannot unmarshall data: %v\n", err)
 				continue
 			}
 
@@ -145,4 +179,5 @@ func SubscribeJSON[T any](
 	}()
 
 	return nil
+
 }

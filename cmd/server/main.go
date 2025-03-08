@@ -32,15 +32,16 @@ func main() {
 
 	gamelogic.PrintServerHelp()
 
-	_, _, err = pubsub.DeclareAndBind(
+	err = pubsub.SubscribeGob(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
 		pubsub.QueueDurable,
+		handleLog,
 	)
 	if err != nil {
-		log.Fatalf("Cannot create queue: %v", err)
+		log.Fatalf("Cannot subscribe to game logs: %v", err)
 	}
 
 loop:
